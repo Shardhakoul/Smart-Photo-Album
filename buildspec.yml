@@ -1,0 +1,12 @@
+version: 0.1
+phases:
+  install:
+    commands:
+      - aws cloudformation package --template-file frontend-template.yml --s3-bucket code-pipeline1709 --output-template-file outSamTemplate.yaml
+      - aws cloudformation package --template-file lambda-template.yml --s3-bucket code-pipeline1709 --output-template-file outSamTemplate.yaml
+artifacts:
+  type: zip
+  files:
+    - frontend-template.yml
+    - lambda-template.yml
+    - outSamTemplate.yaml

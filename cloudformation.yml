@@ -1,0 +1,241 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+Description: Smart-Photo-Application
+Parameters:
+
+  ElasticSearchName:
+    Type: String
+    Description:
+      "domain name of elastic search service"
+    Default : "photos"  
+
+  ApiGatewayName:
+    Type: String
+    Default: 'AI-Photo-Search'
+  
+  ApiGatewayStageName:
+    Type: String
+    AllowedPattern: "[a-z0-9]+"
+    Default: beta
+
+  ApiGatewayHTTPMethod:
+    Type: String
+    Default: GET
+
+  ApiGatewayHTTPMethod1:
+    Type: String
+    Default: PUT
+
+  IndexLambdaARN:
+    Type: String
+    Default: arn:aws:lambda:us-east-1:244220539866:function:index-photos
+
+  SearchLambdaARN:
+    Type: String
+    Default: arn:aws:lambda:us-east-1:244220539866:function:searchPhotos  
+
+Resources:
+  S3Bucket:
+    Type: AWS::S3::Bucket
+    DeletionPolicy: Retain
+    Properties:
+      BucketName: cloudformation-cc-hw3-photostore
+
+  CWS3Bucket:
+    Type: AWS::S3::Bucket
+    DeletionPolicy: Retain
+    Properties:
+      BucketName: cloudformation-cc-hw3-codepipeline    
+
+  FrontendS3Bucket:
+    Type: AWS::S3::Bucket
+    DeletionPolicy: Retain
+    Properties:
+      BucketName: cloudformation-cc-hw3-portal 
+
+  ElasticSearchDemo:
+    Type: AWS::Elasticsearch::Domain
+    Properties: 
+      AccessPolicies:
+        Statement:
+          - Effect: Allow
+            Principal:
+              AWS: ["arn:aws:iam::450113335315:user/root"]
+            Action: "es:*"
+            Resource: !Sub arn:aws:es:${AWS::Region}:${AWS::AccountId}:domain/${ElasticSearchName}/*
+      DomainName: !Ref ElasticSearchName
+      ElasticsearchVersion: '7.10'
+      ElasticsearchClusterConfig:
+        InstanceType: t3.small.elasticsearch
+        InstanceCount: 1
+      EBSOptions:
+        EBSEnabled: true
+        VolumeType: gp2
+        VolumeSize: 10      
+
+  ApiGateway:
+    Type: AWS::ApiGateway::RestApi
+    Properties:
+      Description: Voice Enabled Photo Search application, built during the Cloud and Big Data course at NYU.
+      EndpointConfiguration:
+        Types:
+          - REGIONAL
+      Name: !Ref ApiGatewayName
+
+  ApiGatewayResourceMethod:
+    Type: AWS::ApiGateway::Resource
+    Properties:
+      RestApiId: !Ref ApiGateway
+      ParentId: !GetAtt 
+      - "ApiGateway"
+      - "RootResourceId"
+      PathPart: search
+
+  ApiGatewayRootMethod:
+    Type: AWS::ApiGateway::Method
+    Properties:
+      AuthorizationType: NONE
+      HttpMethod: !Ref ApiGatewayHTTPMethod
+      MethodResponses:
+        - StatusCode: "200"
+          ResponseParameters: 
+            method.response.header.Access-Control-Allow-Origin: true
+      Integration:
+        IntegrationHttpMethod: POST
+        Type: AWS_PROXY
+        Uri: !Sub
+          - "arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${lambdaArn}/invocations"
+          - lambdaArn: !Ref SearchLambdaARN
+      ResourceId: !Ref ApiGatewayResourceMethod
+      RestApiId: !Ref ApiGateway
+
+  OptionsMethod:
+    Type: AWS::ApiGateway::Method
+    Properties:
+      AuthorizationType: NONE
+      RestApiId:
+        Ref: ApiGateway
+      ResourceId:
+        Ref: ApiGatewayResourceMethod
+      HttpMethod: OPTIONS
+      Integration:
+        IntegrationResponses:
+        - StatusCode: 200
+          ResponseParameters:
+            method.response.header.Access-Control-Allow-Headers: "'Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token'"
+            method.response.header.Access-Control-Allow-Methods: "'GET,POST,OPTIONS'"
+            method.response.header.Access-Control-Allow-Origin: "'*'"
+          ResponseTemplates:
+            application/json: ''
+        PassthroughBehavior: WHEN_NO_MATCH
+        RequestTemplates:
+          application/json: '{"statusCode": 200}'
+        Type: MOCK
+      MethodResponses:
+      - StatusCode: 200
+        ResponseModels:
+          application/json: 'Empty'
+        ResponseParameters:
+            method.response.header.Access-Control-Allow-Headers: false
+            method.response.header.Access-Control-Allow-Methods: false
+            method.response.header.Access-Control-Allow-Origin: false
+
+  ApiGatewayResourceMethod1:
+    Type: AWS::ApiGateway::Resource
+    Properties:
+      RestApiId: !Ref ApiGateway
+      ParentId: !GetAtt 
+      - ApiGateway
+      - RootResourceId
+      PathPart: upload
+
+  OptionsMethod1:
+    Type: AWS::ApiGateway::Method
+    Properties:
+      AuthorizationType: NONE
+      RestApiId:
+        Ref: ApiGateway
+      ResourceId:
+        Ref: ApiGatewayResourceMethod1
+      HttpMethod: OPTIONS
+      Integration:
+        IntegrationResponses:
+        - StatusCode: 200
+          ResponseParameters:
+            method.response.header.Access-Control-Allow-Headers: "'Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token'"
+            method.response.header.Access-Control-Allow-Methods: "'PUT,GET,OPTIONS'"
+            method.response.header.Access-Control-Allow-Origin: "'*'"
+          ResponseTemplates:
+            application/json: ''
+        PassthroughBehavior: WHEN_NO_MATCH
+        RequestTemplates:
+          application/json: '{"statusCode": 200}'
+        Type: MOCK
+      MethodResponses:
+      - StatusCode: 200
+        ResponseModels:
+          application/json: 'Empty'
+        ResponseParameters:
+            method.response.header.Access-Control-Allow-Headers: false
+            method.response.header.Access-Control-Allow-Methods: false
+            method.response.header.Access-Control-Allow-Origin: false
+
+  ApiGatewayRootMethod1:
+    Type: AWS::ApiGateway::Method
+    Properties:
+      AuthorizationType: NONE
+      HttpMethod: !Ref ApiGatewayHTTPMethod1
+      MethodResponses:
+        - StatusCode: 200
+          ResponseParameters: 
+            method.response.header.Access-Control-Allow-Origin: true
+      Integration:
+        IntegrationHttpMethod: POST
+        Type: AWS_PROXY
+        Uri: !Sub
+          - arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${lambdaArn}/invocations
+          # - lambdaArn: !GetAtt IndexLambdaFunction.Arn
+          - lambdaArn: !Ref IndexLambdaARN
+      ResourceId: !Ref ApiGatewayResourceMethod1
+      RestApiId: !Ref ApiGateway    
+
+  ApiGatewayDeployment:
+    Type: AWS::ApiGateway::Deployment
+    DependsOn:
+      - OptionsMethod
+      - OptionsMethod1
+      - ApiGatewayRootMethod
+      - ApiGatewayRootMethod1
+    Properties:
+      RestApiId: !Ref ApiGateway
+      StageName: !Ref ApiGatewayStageName  
+
+
+  ApiUsagePlan:
+    Type: "AWS::ApiGateway::UsagePlan"
+    Properties:
+      ApiStages: 
+      - ApiId: !Ref ApiGateway
+        Stage: !Ref ApiGatewayStageName      
+      Description: !Join [" ", [{"Ref": "AWS::StackName"}, "usage plan"]]
+      UsagePlanName: !Join ["", [{"Ref": "AWS::StackName"}, "-usage-plan"]]
+
+  ApiUsagePlanKey:
+    Type: "AWS::ApiGateway::UsagePlanKey"
+    Properties:
+      KeyId: !Ref ApiKey
+      KeyType: API_KEY
+      UsagePlanId: !Ref ApiUsagePlan 
+
+  ApiKey:
+    Type: 'AWS::ApiGateway::ApiKey'
+    # DependsOn:
+    #   - !Ref ApiGatewayDeployment
+    #   - !Ref ApiGatewayStageName   
+    Properties:
+      Name: cloudformation-key-frontend
+      Description: API key for the frontend to access the API
+      Enabled: 'true'
+      StageKeys:
+        - RestApiId: !Ref ApiGateway
+          StageName: !Ref ApiGatewayStageName      

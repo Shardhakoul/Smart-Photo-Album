@@ -1,0 +1,32 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Transform: "AWS::Serverless-2016-10-31"
+Description: Lambda CD
+Resources:
+    LambdaFunction1:
+        Type: AWS::Serverless::Function
+        Properties:
+            Handler: index-photos.lambda_handler
+            Runtime: python3.8
+            FunctionName: SamplePython
+            CodeUri: ./lambda #Directory the source file is
+            Description: "Lambda for CD"
+            MemorySize: 128
+            Timeout: 30
+            Role: "arn:aws:iam::942432719716:role/CodePipelineRole"
+            Environment:
+                Variables:
+                    REGION: us-east-1
+    LambdaFunction2:
+        Type: AWS::Serverless::Function
+        Properties:
+            Handler: search-photos.lambda_handler
+            Runtime: python3.8
+            FunctionName: SamplePython
+            CodeUri: ./lambda #Directory the source file is
+            Description: "Lambda for CD"
+            MemorySize: 128
+            Timeout: 30
+            Role: "arn:aws:iam::942432719716:role/CodePipelineRole"
+            Environment:
+                Variables:
+                    REGION: us-east-1
